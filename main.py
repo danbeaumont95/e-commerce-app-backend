@@ -21,7 +21,6 @@ app = FastAPI()
 client = motor.motor_asyncio.AsyncIOMotorClient(
     f"mongodb+srv://{db_username}:{db_password}@e-commerce-app.z4k96.mongodb.net/myFirstDatabase?retryWrites=true&w=majority", tls=True, tlsAllowInvalidCertificates=True)
 db = client['e-commerce-app']
-print(db, 'dbdbdb')
 
 
 class PyObjectId(ObjectId):
