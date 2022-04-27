@@ -60,6 +60,23 @@ class ItemModel(BaseModel):
         }
 
 
+class UpdateItemModel(BaseModel):
+    description: Optional[str]
+    name: Optional[str]
+    price: Optional[int]
+
+    class Config:
+        arbitrary_types_allowed = True
+        json_encoders = {ObjectId: str}
+        schema_extra = {
+            "example": {
+                "description": "test description",
+                "name": "Dan",
+                "price": "3.0",
+            }
+        }
+
+
 @app.post("/item", response_description="Add new item", response_model=ItemModel)
 async def create_item(item: ItemModel = Body(...)):
     item = jsonable_encoder(item)
@@ -74,3 +91,18 @@ async def create_item(item: ItemModel = Body(...)):
 async def list_items():
     items = await db["items"].find().to_list(1000)
     return items
+
+
+@app.put("/{id}", response_description="Updates an item", response_model=ItemModel)
+async def update_item(id: str, item: UpdateItemModel = Body(...)):
+    item = {k: v for k, v in item.dict().items() if v is not None}
+    if len(item) >= 1:
+        update_result = await db['items'].update_one({"_id": id}, {"$set": item})
+        if update_result.modified_count == 1:
+            if (
+                updated_item := await db['items'].find_one({"_id": id})
+            ) is not None:
+                return updated_item
+    if (existing_item := await db['items'].find_one({"_id": id})) is not None:
+        return existing_item
+    raise HTTPException(status_code=404, detail=f"Item {id} not found")
