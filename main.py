@@ -106,3 +106,10 @@ async def update_item(id: str, item: UpdateItemModel = Body(...)):
     if (existing_item := await db['items'].find_one({"_id": id})) is not None:
         return existing_item
     raise HTTPException(status_code=404, detail=f"Item {id} not found")
+
+
+@app.get("/{id}", response_description="Gets an item by id", response_model=ItemModel)
+async def get_item(id: str):
+    if (item := await db['items'].find_one({"_id": id})) is not None:
+        return item
+    raise HTTPException(status_code=404, detail=f"Item {id} not found")
