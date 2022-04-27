@@ -113,3 +113,11 @@ async def get_item(id: str):
     if (item := await db['items'].find_one({"_id": id})) is not None:
         return item
     raise HTTPException(status_code=404, detail=f"Item {id} not found")
+
+
+@app.delete("/{id}", response_description="Deletes an item")
+async def delete_item(id: str):
+    delete_result = await db['items'].delete_one({"_id": id})
+    if delete_result.deleted_count == 1:
+        return JSONResponse(status_code=status.HTTP_204_NO_CONTENT)
+    raise HTTPException(status_code=404, detail=f"Item {id} not found")
