@@ -64,6 +64,29 @@ class UserModel(BaseModel):
         }
 
 
+class UserReturnModel(BaseModel):
+    id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
+    firstName: str = Field(...)
+    lastName: str = Field(...)
+    email: str = Field(...)
+    mobileNumber: int = Field(...)
+    username: str = Field(...)
+
+    class Config:
+        allow_population_by_field_name = True
+        arbitrary_types_allowed = True
+        json_encoders = {ObjectId: str}
+        schema_extra = {
+            "example": {
+                "firstName": "Jane",
+                "lastName": "Doe",
+                "email": "test@email.com",
+                "username": "janedoe",
+                "mobileNumber": 447515538351,
+            }
+        }
+
+
 class ItemModel(BaseModel):
     id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
     seller: str = Field(...)
@@ -154,3 +177,10 @@ async def create_user(user: UserModel = Body(...)):
     new_user = await db['users'].insert_one(user)
     created_user = await db['users'].find_one({"_id": new_user.inserted_id})
     return JSONResponse(status_code=status.HTTP_201_CREATED, content=created_user)
+
+
+@app.get('/user/{id}', response_description="Gets a user by id", response_model=UserReturnModel)
+async def get_user(id: str):
+    if (user := await db['users'].find_one({"_id": id})) is not None:
+        return user
+    raise HTTPException(status_code=404, detail=f"User {id} not found")
