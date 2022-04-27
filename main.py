@@ -8,11 +8,17 @@ from bson import ObjectId
 from typing import Optional, List
 import motor.motor_asyncio
 from dotenv import load_dotenv, dotenv_values
+import time
+import jwt
+from typing import Dict
 
 config = dotenv_values(".env")
 db_name = config['db_name']
 db_username = config['db_username']
 db_password = config['db_password']
+
+JWT_SECRET = config["secret"]
+JWT_ALGORITHM = config["algorithm"]
 
 # uvicorn main:app --reload
 load_dotenv()
@@ -184,3 +190,62 @@ async def get_user(id: str):
     if (user := await db['users'].find_one({"_id": id})) is not None:
         return user
     raise HTTPException(status_code=404, detail=f"User {id} not found")
+
+
+def token_response(token: str):
+    return {
+        "access_token": token
+    }
+
+
+def signJWT(user_id: str) -> Dict[str, str]:
+    payload = {
+        "user_id": user_id,
+        "expires": time.time() + 600
+    }
+    token = jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+    return token_response(token)
+
+
+def decodeJWT(token: str) -> dict:
+    try:
+        decoded_token = jwt.decode(
+            token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        return decoded_token if decoded_token['expires'] >= time.time() else None
+    except:
+        return {}
+
+
+class TestUserLoginSchema(BaseModel):
+    email: EmailStr = Field(...)
+    password: str = Field(...)
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "email": "test@hotmail.com",
+                "password": "password"
+            }
+        }
+
+
+class TestUserSchema(BaseModel):
+    fullname: str = Field(...)
+    email: EmailStr = Field(...)
+    password: str = Field(...)
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "fullname": "Abdulazeez Abdulazeez Adeshina",
+                "email": "abdulazeez@x.com",
+                "password": "weakpassword"
+            }
+        }
+
+
+@app.post('/user/createAccessToken')
+async def sign_up(user: TestUserSchema = Body(...)):
+    user = jsonable_encoder(user)
+    await db['users'].insert_one(user)
+    return signJWT(user["email"])
