@@ -1,6 +1,6 @@
 
 import os
-from fastapi import FastAPI, Body, HTTPException, status
+from fastapi import FastAPI, Body, HTTPException, status, Request
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel, Field, EmailStr
@@ -11,6 +11,7 @@ from dotenv import load_dotenv, dotenv_values
 import time
 import jwt
 from typing import Dict
+from collections import namedtuple
 
 config = dotenv_values(".env")
 db_name = config['db_name']
@@ -66,6 +67,21 @@ class UserModel(BaseModel):
                 "password": "password",
                 "username": "janedoe",
                 "mobileNumber": 447515538351,
+            }
+        }
+
+
+class SessionModel(BaseModel):
+    id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
+    accessToken: str = Field(...)
+
+    class Config:
+        allow_population_by_field_name = True
+        arbitrary_types_allowed = True
+        json_encoders = {ObjectId: str}
+        schema_extra = {
+            "example": {
+                "accessToken": "accesstoken",
             }
         }
 
@@ -221,6 +237,7 @@ class TestUserLoginSchema(BaseModel):
     password: str = Field(...)
 
     class Config:
+        allow_population_by_field_name = True
         schema_extra = {
             "example": {
                 "email": "test@hotmail.com",
@@ -249,3 +266,41 @@ async def sign_up(user: TestUserSchema = Body(...)):
     user = jsonable_encoder(user)
     await db['users'].insert_one(user)
     return signJWT(user["email"])
+
+
+async def check_user(data: TestUserLoginSchema):
+    all_users = await db['users'].find().to_list(1000)
+    for user in all_users:
+        if user.email == data.email and user.password == data.password:
+            return True
+    return False
+
+
+@app.post('/user/login')
+async def login(user: TestUserLoginSchema = Body(...)):
+    async def check_user(data=Body(...)):
+
+        all_users = await db['users'].find().to_list(1000)
+        for user in all_users:
+            del user['_id']
+            object_name = namedtuple("ObjectName", user.keys())(*user.values())
+            if object_name.email == data.email and object_name.password == data.password:
+                return True
+        return False
+
+    async def save_token_in_db(token: SessionModel = Body(...)):
+        token = jsonable_encoder(token)
+        new_token = await db['user-sessions'].insert_one(token)
+        created_token = await db['user-sessions'].find_one({"_id": new_token.inserted_id})
+        return created_token
+
+    res = await check_user(user)
+
+    if res:
+        user = jsonable_encoder(user)
+        token = signJWT(user["email"])
+        await save_token_in_db(token)
+        return token
+    return {
+        "error": "Wrong login details"
+    }
