@@ -71,9 +71,24 @@ class UserModel(BaseModel):
         }
 
 
+class UserId(BaseModel):
+    id: str = Field(...)
+
+    class Config:
+        allow_population_by_field_name = True
+        arbitrary_types_allowed = True
+        json_encoders = {ObjectId: str}
+        schema_extra = {
+            "example": {
+                "id": "123456",
+            }
+        }
+
+
 class SessionModel(BaseModel):
     id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
     accessToken: str = Field(...)
+    userId: str = Field(...)
 
     class Config:
         allow_population_by_field_name = True
@@ -288,18 +303,28 @@ async def login(user: TestUserLoginSchema = Body(...)):
                 return True
         return False
 
-    async def save_token_in_db(token: SessionModel = Body(...)):
+    async def save_token_in_db(token: SessionModel = Body(...), id: str = Body(...)):
         token = jsonable_encoder(token)
-        new_token = await db['user-sessions'].insert_one(token)
+        userId = jsonable_encoder(id)
+        insert_obj = {"token": token, "userId": userId}
+        new_token = await db['user-sessions'].insert_one(jsonable_encoder(insert_obj))
         created_token = await db['user-sessions'].find_one({"_id": new_token.inserted_id})
         return created_token
+
+    async def get_user(email):
+        if (user := await db['users'].find_one({"email": email})) is not None:
+            return user
+        raise HTTPException(status_code=404, detail=f"User {id} not found")
 
     res = await check_user(user)
 
     if res:
         user = jsonable_encoder(user)
         token = signJWT(user["email"])
-        await save_token_in_db(token)
+        user_details = await get_user(user['email'])
+        user_id = user_details['_id']
+
+        await save_token_in_db(token, str(user_id))
         return token
     return {
         "error": "Wrong login details"
