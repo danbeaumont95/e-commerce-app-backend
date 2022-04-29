@@ -2,10 +2,12 @@ from fastapi import APIRouter
 from ..item.model import ItemModel, UpdateItemModel
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
-from fastapi import Body, HTTPException, status, APIRouter
+from fastapi import Body, HTTPException, status, APIRouter, Request
 from typing import List
+import time
+import jwt
 
-from ..db import db
+from ..db import db, jwt_algorithm, jwt_secret
 
 router = APIRouter(
     prefix="/item",
@@ -15,12 +17,13 @@ router = APIRouter(
 )
 
 
-@router.post("/", response_description="Add new item", response_model=ItemModel)
-async def create_item(item: ItemModel = Body(...)):
-    item = jsonable_encoder(item)
-    new_item = await db["items"].insert_one(item)
-    created_item = await db["items"].find_one({"_id": new_item.inserted_id})
-    return JSONResponse(status_code=status.HTTP_201_CREATED, content=created_item)
+def decodeJWT(token: str) -> dict:
+    try:
+        decoded_token = jwt.decode(
+            token, jwt_secret, algorithms=[jwt_algorithm])
+        return decoded_token if decoded_token['expires'] >= time.time() else None
+    except:
+        return {}
 
 
 @router.get(
@@ -59,3 +62,29 @@ async def delete_item(id: str):
     if delete_result.deleted_count == 1:
         return JSONResponse(status_code=status.HTTP_204_NO_CONTENT)
     raise HTTPException(status_code=404, detail=f"Item {id} not found")
+
+
+@router.post('/', response_description="Add new item")
+async def create_new_item(request: Request, item: ItemModel = Body(...)):
+    bearer_token = request.headers.get('authorization')
+
+    access_token = bearer_token[7:]
+
+    isAllowed = decodeJWT(access_token)
+
+    if isAllowed is not None:
+
+        item = jsonable_encoder(item)
+        created_item = {"description": item['description'],
+                        "seller": isAllowed['user_id'], "name": item['name'], "price": item['price']}
+
+        new_item = await db['items'].insert_one(created_item)
+
+        await db["items"].find_one({"_id": new_item.inserted_id})
+
+        return {
+            "Message": "Item inserted in DB"
+        }
+    return {
+        "Message": "Token expired, please log in again"
+    }
