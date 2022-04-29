@@ -18,6 +18,15 @@ router = APIRouter(
 )
 
 
+def decodeJWT(token: str) -> dict:
+    try:
+        decoded_token = jwt.decode(
+            token, jwt_secret, algorithms=[jwt_algorithm])
+        return decoded_token if decoded_token['expires'] >= time.time() else None
+    except:
+        return {}
+
+
 def token_response(token: str):
     return {
         "access_token": token
@@ -83,9 +92,9 @@ async def login(user: TestUserLoginSchema = Body(...)):
 
     if res:
         user = jsonable_encoder(user)
-        token = signJWT(user["email"])
         user_details = await get_user(user['email'])
         user_id = user_details['_id']
+        token = signJWT(user_id)
 
         await save_token_in_db(token, str(user_id))
         return token
