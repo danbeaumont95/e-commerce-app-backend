@@ -7,6 +7,7 @@ from collections import namedtuple
 import time
 from typing import Dict
 import jwt
+from email_validator import validate_email, EmailNotValidError
 
 from ..db import db, jwt_algorithm, jwt_secret
 
@@ -50,15 +51,34 @@ def signJWT(user_id: str) -> Dict[str, str]:
     return token_response(access_token, refresh_token)
 
 
+async def check_if_user_taken(input: str, value: str):
+    user_exists = await db['users'].find_one({f"{value}": input})
+    return user_exists
+
+
 @router.post('/', tags=['user'])
 async def create_user(user: UserModel = Body(...)):
     user = jsonable_encoder(user)
-    print(len(str(user['mobileNumber'])), 'LEN')
     if len(user['firstName']) < 1 or len(user['lastName']) < 1 or len(user['email']) < 1 or len(user['password']) < 1 or len(user['username']) < 1 or len(str(user['mobileNumber'])) < 1:
         return {"error": "Missing required field"}
-    new_user = await db['users'].insert_one(user)
-    created_user = await db['users'].find_one({"_id": new_user.inserted_id})
-    return JSONResponse(status_code=status.HTTP_201_CREATED, content=created_user)
+    try:
+        validate_email(user['email']).email
+        email_taken = await check_if_user_taken(user['email'], 'email')
+        username_taken = await check_if_user_taken(user['username'], 'username')
+        mobileNumber_taken = await check_if_user_taken(user['mobileNumber'], 'mobileNumber')
+
+        if email_taken != None:
+            return {"error": "Email Already exists"}
+        if username_taken != None:
+            return {"error": "Username Already exists"}
+        if mobileNumber_taken != None:
+            return {"error": "Mobile Number Already exists"}
+
+        new_user = await db['users'].insert_one(user)
+        created_user = await db['users'].find_one({"_id": new_user.inserted_id})
+        return JSONResponse(status_code=status.HTTP_201_CREATED, content=created_user)
+    except EmailNotValidError as e:
+        return {"error": str(e)}
 
 
 @router.get('/{id}', tags=['user'], response_description="Gets a user by id", response_model=UserReturnModel)
