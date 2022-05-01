@@ -1,12 +1,13 @@
 # uvicorn app.main:app --reload
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .routers import user, item
+from .routers import user, item, basket
 
 app = FastAPI()
 origins = ["*"]
 app.include_router(user.router)
 app.include_router(item.router)
+app.include_router(basket.router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
