@@ -10,6 +10,7 @@ import jwt
 from email_validator import validate_email, EmailNotValidError
 
 from ..db import db, jwt_algorithm, jwt_secret
+from .basket import create_basket
 
 router = APIRouter(
     prefix="/user",
@@ -76,6 +77,9 @@ async def create_user(user: UserModel = Body(...)):
 
         new_user = await db['users'].insert_one(user)
         created_user = await db['users'].find_one({"_id": new_user.inserted_id})
+
+        await create_basket({"userId": created_user['_id'], "items": []})
+
         return JSONResponse(status_code=status.HTTP_201_CREATED, content=created_user)
     except EmailNotValidError as e:
         return {"error": str(e)}
