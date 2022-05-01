@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Body, status, Request
+from fastapi import APIRouter, Body, status, Request, HTTPException
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from ..basket.model import BasketModel, ItemToAdd
@@ -47,4 +47,24 @@ async def add_item_to_basket(request: Request, item: ItemToAdd = Body(...)):
     else:
         return {
             "Message": "Token expired, please log in again"
+        }
+
+
+@router.get('/', tags=['basket'], response_description='Returns logged in users basket', response_model=BasketModel)
+async def get_my_basket(request: Request):
+    bearer_token = request.headers.get('authorization')
+
+    access_token = bearer_token[7:]
+    isAllowed = decodeJWT(access_token)
+
+    if isAllowed is not None:
+        user_id = isAllowed['user_id']
+        if (basket := await db['baskets'].find_one({"userId": user_id})) is not None:
+            return basket
+        raise HTTPException(
+            status_code=404, detail=f"Your basket was not found")
+    else:
+
+        return {
+            "error": "Token expired, please log in again"
         }
