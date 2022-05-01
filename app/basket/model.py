@@ -41,3 +41,29 @@ class BasketModel(BaseModel):
                 ]
             }
         }
+
+
+class ItemToAdd(BaseModel):
+    name: str = Field(...)
+    seller: str = Field(...)
+    price: int = Field(...)
+    itemId: str = Field(...)
+
+    class Config:
+        allow_population_by_field_name = True
+        arbitrary_types_allowed = True
+        json_encoders = {ObjectId: str}
+        schema_extra = {
+            "example": {
+                "id": "abc123",
+                "userId": "dansId123",
+                "items": [
+                    {
+                      "name": "Playstation",
+                      "seller": "dan",
+                      "price": 123,
+                      "itemId": "321"
+                    }
+                ]
+            }
+        }
