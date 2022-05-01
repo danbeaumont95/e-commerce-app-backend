@@ -53,6 +53,9 @@ def signJWT(user_id: str) -> Dict[str, str]:
 @router.post('/', tags=['user'])
 async def create_user(user: UserModel = Body(...)):
     user = jsonable_encoder(user)
+    print(len(str(user['mobileNumber'])), 'LEN')
+    if len(user['firstName']) < 1 or len(user['lastName']) < 1 or len(user['email']) < 1 or len(user['password']) < 1 or len(user['username']) < 1 or len(str(user['mobileNumber'])) < 1:
+        return {"error": "Missing required field"}
     new_user = await db['users'].insert_one(user)
     created_user = await db['users'].find_one({"_id": new_user.inserted_id})
     return JSONResponse(status_code=status.HTTP_201_CREATED, content=created_user)
