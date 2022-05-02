@@ -98,3 +98,19 @@ async def delete_item_from_basket(request: Request, id: str):
         return {
             "error": "Token expired, please log in again"
         }
+
+
+@router.get('/amount', tags=['basket'], response_description='Gets amount of items in basket')
+async def get_amount_of_items_in_basket(request: Request):
+    bearer_token = request.headers.get('authorization')
+
+    access_token = bearer_token[7:]
+    isAllowed = decodeJWT(access_token)
+    if isAllowed is not None:
+        user_id = isAllowed['user_id']
+        user_basket = await db['baskets'].find_one({"userId": user_id})
+        items = user_basket['items']
+
+        return {"amount": len(items)}
+    else:
+        return {"error": "Token expired, please log in again"}
