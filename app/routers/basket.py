@@ -4,6 +4,7 @@ from fastapi.responses import JSONResponse
 from ..basket.model import BasketModel, ItemToAdd
 from ..db import db
 from .item import decodeJWT
+from bson.objectid import ObjectId
 
 router = APIRouter(
     prefix="/basket",
@@ -25,8 +26,8 @@ async def create_basket(basket: BasketModel = Body(...)):
     return JSONResponse(status_code=status.HTTP_201_CREATED, content=created_basket)
 
 
-@router.post('/addToBasket')
-async def add_item_to_basket(request: Request, item: ItemToAdd = Body(...)):
+@router.post('/addToBasket/{id}')
+async def add_item_to_basket(request: Request, id: str):
 
     bearer_token = request.headers.get('authorization')
 
@@ -36,7 +37,9 @@ async def add_item_to_basket(request: Request, item: ItemToAdd = Body(...)):
     if isAllowed is not None:
 
         user_id = isAllowed['user_id']
-        item = jsonable_encoder(item)
+        item = await db['items'].find_one({"_id": ObjectId(id)})
+
+        # item = jsonable_encoder(item)
         await db['baskets'].update_one({"userId": user_id}, {"$push": {
             "items": item
         }})
