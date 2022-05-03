@@ -11,7 +11,7 @@ import jwt
 import os
 import datetime
 from botocore.exceptions import ClientError
-
+from bson.objectid import ObjectId
 
 from ..db import db, jwt_algorithm, jwt_secret, aws_access_key_id, aws_secret_access_key
 
@@ -44,27 +44,27 @@ async def list_items():
 async def update_item(id: str, item: UpdateItemModel = Body(...)):
     item = {k: v for k, v in item.dict().items() if v is not None}
     if len(item) >= 1:
-        update_result = await db['items'].update_one({"_id": id}, {"$set": item})
+        update_result = await db['items'].update_one({"_id": ObjectId(id)}, {"$set": item})
         if update_result.modified_count == 1:
             if (
-                updated_item := await db['items'].find_one({"_id": id})
+                updated_item := await db['items'].find_one({"_id": ObjectId(id)})
             ) is not None:
                 return updated_item
-    if (existing_item := await db['items'].find_one({"_id": id})) is not None:
+    if (existing_item := await db['items'].find_one({"_id": ObjectId(id)})) is not None:
         return existing_item
     raise HTTPException(status_code=404, detail=f"Item {id} not found")
 
 
 @router.get("/{id}", response_description="Gets an item by id", response_model=ItemModel)
 async def get_item(id: str):
-    if (item := await db['items'].find_one({"_id": id})) is not None:
+    if (item := await db['items'].find_one({"_id": ObjectId(id)})) is not None:
         return item
     raise HTTPException(status_code=404, detail=f"Item {id} not found")
 
 
 @router.delete("/{id}", response_description="Deletes an item")
 async def delete_item(id: str):
-    delete_result = await db['items'].delete_one({"_id": id})
+    delete_result = await db['items'].delete_one({"_id": ObjectId(id)})
     if delete_result.deleted_count == 1:
         return JSONResponse(status_code=status.HTTP_204_NO_CONTENT)
     raise HTTPException(status_code=404, detail=f"Item {id} not found")
