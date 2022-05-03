@@ -25,6 +25,7 @@ class ItemModel(BaseModel):
     description: str = Field(...)
     name: str = Field(...)
     price: int = Field(...)
+    image: str = Field(...)
 
     class Config:
         allow_population_by_field_name = True
@@ -36,6 +37,7 @@ class ItemModel(BaseModel):
                 "description": "test description",
                 "name": "Dan",
                 "price": "3.0",
+                "image": "https://python-e-commerce-app.s3.eu-west-2.amazonaws.com/1.jpg"
             }
         }
 

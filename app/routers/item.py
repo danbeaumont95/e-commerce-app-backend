@@ -1,13 +1,19 @@
+import boto3
 from fastapi import APIRouter
+from pydantic import Field
 from ..item.model import ItemModel, UpdateItemModel
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
-from fastapi import Body, HTTPException, status, APIRouter, Request
+from fastapi import Body, HTTPException, status, APIRouter, Request, Form, File, UploadFile
 from typing import List
 import time
 import jwt
+import os
+import datetime
+from botocore.exceptions import ClientError
 
-from ..db import db, jwt_algorithm, jwt_secret
+
+from ..db import db, jwt_algorithm, jwt_secret, aws_access_key_id, aws_secret_access_key
 
 router = APIRouter(
     prefix="/item",
@@ -64,8 +70,41 @@ async def delete_item(id: str):
     raise HTTPException(status_code=404, detail=f"Item {id} not found")
 
 
+async def upload_fileobj(file_name, bucket, key):
+
+    """Upload a file to an S3 bucket
+    :param key:
+    :param file_name: File to upload
+    :param bucket: Bucket to upload to
+    :return: True if file was uploaded, else False
+    """
+
+    # If S3 object_name was not specified, use file_name
+    if (key is None) or (bucket is None):
+        print("key and bucket cannot be None")
+        return False
+
+    # Upload the file
+    s3_client = boto3.client('s3')
+
+    try:
+
+        response = s3_client.upload_fileobj(
+            file_name, bucket, key, ExtraArgs={'ACL': 'public-read'})
+
+    except ClientError as e:
+        print("INFO: Failed to upload image")
+        print(e)
+        return False
+
+    print(
+        "File object uploaded to https://s3.amazonaws.com/{}{}".format(bucket, key))
+    return True
+
+
 @router.post('/', response_description="Add new item")
-async def create_new_item(request: Request, item: ItemModel = Body(...)):
+async def create_new_item(request: Request, fileobject: UploadFile = File(...), description: str = Body(...), name: str = Body(...), price: str = Body(...)):
+
     bearer_token = request.headers.get('authorization')
 
     access_token = bearer_token[7:]
@@ -74,17 +113,31 @@ async def create_new_item(request: Request, item: ItemModel = Body(...)):
 
     if isAllowed is not None:
 
-        item = jsonable_encoder(item)
-        created_item = {"description": item['description'],
-                        "seller": isAllowed['user_id'], "name": item['name'], "price": item['price']}
+        filename = fileobject.filename
 
-        new_item = await db['items'].insert_one(created_item)
+        current_time = datetime.datetime.now()
+        split_file_name = os.path.splitext(filename)
 
-        await db["items"].find_one({"_id": new_item.inserted_id})
+        file_name_unique = str(current_time.timestamp()).replace('.', '')
 
+        file_extension = split_file_name[1]  # file extention
+
+        data = fileobject.file._file  # Converting tempfile.SpooledTemporaryFile to io.BytesIO
+
+        uploads3 = await upload_fileobj(
+            data,  'python-e-commerce-app', filename)
+
+        if uploads3:
+            created_item = {"description": description,
+                            "seller": isAllowed['user_id'], "name": name, "price": price, "image": f"https://python-e-commerce-app.s3.eu-west-2.amazonaws.com/{filename}"}
+
+            new_item = await db['items'].insert_one(created_item)
+
+            return {"status": True, "message": "Item inserted in DB"}
+        else:
+            raise HTTPException(
+                status_code=400, detail="Failed to upload in S3")
+    else:
         return {
-            "Message": "Item inserted in DB"
+            "Message": "Token expired, please log in again"
         }
-    return {
-        "Message": "Token expired, please log in again"
-    }
