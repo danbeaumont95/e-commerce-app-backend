@@ -84,8 +84,8 @@ async def delete_item_from_basket(request: Request, id: str):
         user_basket = await db['baskets'].find_one({"userId": user_id})
 
         try:
-            await db['baskets'].update_one({"_id": user_basket['_id']}, {"$pull": {
-                "items": {"itemId": id}
+            await db['baskets'].update_one({"_id": ObjectId(user_basket['_id'])}, {"$pull": {
+                "items": {"_id": ObjectId(id)}
             }})
 
             updated_user_basket = await db['baskets'].find_one({"userId": user_id})
