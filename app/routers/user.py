@@ -1,8 +1,7 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Body, HTTPException, status, APIRouter
 from ..user.model import UserModel, UserReturnModel, TestUserLoginSchema, SessionModel
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
-from fastapi import Body, HTTPException, status, APIRouter
 from collections import namedtuple
 import time
 from typing import Dict
@@ -164,12 +163,15 @@ async def reIssueAccessToken(token):
     return new_token
 
 
-@router.post('/refreshToken')
+@router.post('/refreshToken', tags=['user'], response_description="Returns a new access token if original access token has expired")
 async def refresh_token(request: Request):
 
     refresh_token = request.headers.get('x-refresh')
 
     bearer_token = request.headers.get('authorization')
+
+    if refresh_token is None or bearer_token is None:
+        return {"error": "Missing token"}
 
     access_token = bearer_token[7:]
     isAllowed = decodeJWT(access_token)
@@ -177,3 +179,21 @@ async def refresh_token(request: Request):
     if isAllowed is None and refresh_token:
         new_access_token = await reIssueAccessToken(access_token)
         return new_access_token
+
+
+@router.get('/me/details')
+async def get_me(request: Request):
+    bearer_token = request.headers.get('authorization')
+
+    access_token = bearer_token[7:]
+
+    isAllowed = decodeJWT(access_token)
+
+    if isAllowed is not None:
+        user_id = isAllowed['user_id']
+        if (user := await db['users'].find_one({"_id": user_id})) is not None:
+            return user
+        raise HTTPException(
+            status_code=404, detail=f"User {user_id} not found")
+    else:
+        return {"error": "Unable to find user"}
