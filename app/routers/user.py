@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from ..user.model import UserModel, UserReturnModel, TestUserLoginSchema, SessionModel
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
@@ -92,11 +92,14 @@ async def get_user(id: str):
     raise HTTPException(status_code=404, detail=f"User {id} not found")
 
 
-# @router.post('/user/createAccessToken')
-# async def sign_up(user: TestUserSchema = Body(...)):
-#     user = jsonable_encoder(user)
-#     await db['users'].insert_one(user)
-#     return signJWT(user["email"])
+async def save_token_in_db(token: SessionModel = Body(...), id: str = Body(...)):
+    token = jsonable_encoder(token)
+    userId = jsonable_encoder(id)
+    insert_obj = {"token": token, "userId": userId}
+    new_token = await db['user-sessions'].insert_one(jsonable_encoder(insert_obj))
+    created_token = await db['user-sessions'].find_one({"_id": new_token.inserted_id})
+    return created_token
+
 
 @router.post('/login')
 async def login(user: TestUserLoginSchema = Body(...)):
@@ -109,14 +112,6 @@ async def login(user: TestUserLoginSchema = Body(...)):
             if object_name.email == data.email and object_name.password == data.password:
                 return True
         return False
-
-    async def save_token_in_db(token: SessionModel = Body(...), id: str = Body(...)):
-        token = jsonable_encoder(token)
-        userId = jsonable_encoder(id)
-        insert_obj = {"token": token, "userId": userId}
-        new_token = await db['user-sessions'].insert_one(jsonable_encoder(insert_obj))
-        created_token = await db['user-sessions'].find_one({"_id": new_token.inserted_id})
-        return created_token
 
     async def get_user(email):
         if (user := await db['users'].find_one({"email": email})) is not None:
@@ -136,3 +131,49 @@ async def login(user: TestUserLoginSchema = Body(...)):
     return {
         "error": "Wrong login details"
     }
+
+
+def new_token_response(access_token: str):
+    return {
+        "access_token": access_token
+    }
+
+
+def sign_new_jwt(user_id: str) -> Dict[str, str]:
+    access_payload = {
+        "user_id": user_id,
+        "expires": time.time() + 600
+    }
+    access_token = jwt.encode(
+        access_payload, jwt_secret, algorithm=jwt_algorithm)
+    return new_token_response(access_token)
+
+
+async def reIssueAccessToken(token):
+
+    def decodeJWT(token: str) -> dict:
+        decoded_token = jwt.decode(
+            token, jwt_secret, algorithms=[jwt_algorithm])
+        return decoded_token if decoded_token['expires'] <= time.time() else None
+
+    new_decoded = decodeJWT(token)
+
+    new_token = sign_new_jwt(new_decoded['user_id'])
+
+    await save_token_in_db(new_token, str(new_decoded['user_id']))
+    return new_token
+
+
+@router.post('/refreshToken')
+async def refresh_token(request: Request):
+
+    refresh_token = request.headers.get('x-refresh')
+
+    bearer_token = request.headers.get('authorization')
+
+    access_token = bearer_token[7:]
+    isAllowed = decodeJWT(access_token)
+
+    if isAllowed is None and refresh_token:
+        new_access_token = await reIssueAccessToken(access_token)
+        return new_access_token
