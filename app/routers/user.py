@@ -7,7 +7,7 @@ import time
 from typing import Dict
 import jwt
 from email_validator import validate_email, EmailNotValidError
-
+from bson.objectid import ObjectId
 from ..db import db, jwt_algorithm, jwt_secret
 from .basket import create_basket
 
@@ -197,3 +197,47 @@ async def get_me(request: Request):
             status_code=404, detail=f"User {user_id} not found")
     else:
         return {"error": "Unable to find user"}
+
+
+@router.put('/me/details', tags=['user'])
+async def update_user_details(request: Request, user=Body(...)):
+    bearer_token = request.headers.get('authorization')
+
+    access_token = bearer_token[7:]
+
+    isAllowed = decodeJWT(access_token)
+
+    if isAllowed is not None:
+        user_id = isAllowed['user_id']
+        if "firstName" in user and "lastName" in user:
+
+            await db['users'].find_one_and_update({"_id": user_id}, {"$set": {
+                "firstName": user['firstName'],
+                "lastName": user['lastName']
+            }})
+            updated_user = await db['users'].find_one({"_id": user_id})
+
+            return updated_user
+        if "email" in user:
+            await db['users'].find_one_and_update({"_id": user_id}, {"$set": {
+                "email": user['email']
+            }})
+            updated_user = await db['users'].find_one({"_id": user_id})
+
+            return updated_user
+        if "mobileNumber" in user:
+            await db['users'].find_one_and_update({"_id": user_id}, {"$set": {
+                "mobileNumber": user['mobileNumber']
+            }})
+            updated_user = await db['users'].find_one({"_id": user_id})
+            return updated_user
+        if "password" in user:
+            await db['users'].find_one_and_update({"_id": user_id}, {"$set": {
+                "password": user['password']
+            }})
+            updated_user = await db['users'].find_one({"_id": user_id})
+            return updated_user
+        else:
+            return {"error": "Missing details"}
+    else:
+        return {"error": "Unable to verify, please log in again"}
