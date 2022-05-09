@@ -56,6 +56,11 @@ async def check_if_user_taken(input: str, value: str):
     return user_exists
 
 
+async def create_address(id: str):
+    new_address = await db['addresses'].insert_one({"userId": id, "addresses": []})
+    return new_address
+
+
 @router.post('/', tags=['user'])
 async def create_user(user: UserModel = Body(...)):
     user = jsonable_encoder(user)
@@ -78,6 +83,7 @@ async def create_user(user: UserModel = Body(...)):
         created_user = await db['users'].find_one({"_id": new_user.inserted_id})
 
         await create_basket({"userId": created_user['_id'], "items": []})
+        await create_address(created_user['_id'])
 
         return JSONResponse(status_code=status.HTTP_201_CREATED, content=created_user)
     except EmailNotValidError as e:
