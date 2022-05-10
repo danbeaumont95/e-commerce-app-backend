@@ -3,7 +3,7 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from ..db import db
 from .item import decodeJWT
-from ..address.model import AddressModel
+from ..address.model import AddressModel, AddAddressModel
 from bson.objectid import ObjectId
 
 router = APIRouter(
@@ -15,8 +15,9 @@ router = APIRouter(
 
 
 @router.post('/')
-async def add_address(request: Request, address=Body(...)):
+async def add_address(request: Request, address: AddAddressModel = Body(...)):
     bearer_token = request.headers.get('authorization')
+    formatted_address = jsonable_encoder(address)
 
     access_token = bearer_token[7:]
     isAllowed = decodeJWT(access_token)
@@ -29,8 +30,10 @@ async def add_address(request: Request, address=Body(...)):
         if found_address is None:
             return {"error": "Unable to add address"}
         await db['addresses'].update_one({"userId": user_id}, {"$push": {
-            "addresses": address
+            "addresses": formatted_address
         }})
         return {
             "Message": "Address added!"
         }
+    else:
+        return {"error": "Token expired! Please log in again!"}
