@@ -59,26 +59,14 @@ async def update_address(request: Request, id: str, body=Body(...)):
         if users_address is None:
             return {"error": "No addresses found"}
 
-        if "firstLine" in body:
-            await db['addresses'].find_one_and_update({"userId": user_id, "addresses.id": id}, {"$set": {
-                "addresses.$.firstLine": body['firstLine']
-            }})
-        if "secondLine" in body:
-            await db['addresses'].find_one_and_update({"userId": user_id, "addresses.id": id}, {"$set": {
-                "addresses.$.secondLine": body['secondLine']
-            }})
-        if "TownCity" in body:
-            await db['addresses'].find_one_and_update({"userId": user_id, "addresses.id": id}, {"$set": {
-                "addresses.$.TownCity": body['TownCity']
-            }})
-        if "Postcode" in body:
-            await db['addresses'].find_one_and_update({"userId": user_id, "addresses.id": id}, {"$set": {
-                "addresses.$.Postcode": body['Postcode']
-            }})
-        if "Country" in body:
-            await db['addresses'].find_one_and_update({"userId": user_id, "addresses.id": id}, {"$set": {
-                "addresses.$.Country": body['Country']
-            }})
+        await db['addresses'].find_one_and_update({"userId": user_id, "addresses.id": id}, {"$set": {
+            "addresses.$.firstLine": body['firstLine'],
+            "addresses.$.secondLine": body['secondLine'],
+            "addresses.$.TownCity": body['TownCity'],
+            "addresses.$.Postcode": body['Postcode'],
+            "addresses.$.Country": body['Country']
+        }})
+
         return {
             "Message": "Address updated"
         }
