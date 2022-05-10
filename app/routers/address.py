@@ -5,6 +5,7 @@ from ..db import db
 from .item import decodeJWT
 from ..address.model import AddressModel, AddAddressModel
 from bson.objectid import ObjectId
+import uuid
 
 router = APIRouter(
     prefix="/address",
@@ -29,8 +30,12 @@ async def add_address(request: Request, address: AddAddressModel = Body(...)):
 
         if found_address is None:
             return {"error": "Unable to add address"}
+
+        new_address = {"id": str(uuid.uuid4()), "firstLine": formatted_address['firstLine'], "secondLine": formatted_address['secondLine'],
+                       "TownCity": formatted_address['TownCity'], "Postcode": formatted_address['Postcode'], "Country": formatted_address['Country']}
+
         await db['addresses'].update_one({"userId": user_id}, {"$push": {
-            "addresses": formatted_address
+            "addresses": new_address
         }})
         return {
             "Message": "Address added!"
