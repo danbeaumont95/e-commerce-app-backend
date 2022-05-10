@@ -84,3 +84,20 @@ async def update_address(request: Request, id: str, body=Body(...)):
         }
     else:
         return {"error": "Token expired! Please log in again!"}
+
+
+@router.get('/', response_model=AddressModel)
+async def get_all_addresses(request: Request):
+    bearer_token = request.headers.get('authorization')
+
+    access_token = bearer_token[7:]
+    isAllowed = decodeJWT(access_token)
+
+    if isAllowed is not None:
+        user_id = isAllowed['user_id']
+        if (address := await db['addresses'].find_one({"userId": user_id})) is not None:
+            return address
+        raise HTTPException(
+            status_code=404, detail=f"No addresses found")
+    else:
+        return {"error": "Token expired! Please log in again!"}
