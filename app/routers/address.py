@@ -42,3 +42,45 @@ async def add_address(request: Request, address: AddAddressModel = Body(...)):
         }
     else:
         return {"error": "Token expired! Please log in again!"}
+
+
+@router.put('/{id}')
+async def update_address(request: Request, id: str, body=Body(...)):
+    bearer_token = request.headers.get('authorization')
+
+    access_token = bearer_token[7:]
+    isAllowed = decodeJWT(access_token)
+
+    if isAllowed is not None:
+        user_id = isAllowed['user_id']
+
+        users_address = await db['addresses'].find_one({"userId": user_id})
+
+        if users_address is None:
+            return {"error": "No addresses found"}
+
+        if "firstLine" in body:
+            await db['addresses'].find_one_and_update({"userId": user_id, "addresses.id": id}, {"$set": {
+                "addresses.$.firstLine": body['firstLine']
+            }})
+        if "secondLine" in body:
+            await db['addresses'].find_one_and_update({"userId": user_id, "addresses.id": id}, {"$set": {
+                "addresses.$.secondLine": body['secondLine']
+            }})
+        if "TownCity" in body:
+            await db['addresses'].find_one_and_update({"userId": user_id, "addresses.id": id}, {"$set": {
+                "addresses.$.TownCity": body['TownCity']
+            }})
+        if "Postcode" in body:
+            await db['addresses'].find_one_and_update({"userId": user_id, "addresses.id": id}, {"$set": {
+                "addresses.$.Postcode": body['Postcode']
+            }})
+        if "Country" in body:
+            await db['addresses'].find_one_and_update({"userId": user_id, "addresses.id": id}, {"$set": {
+                "addresses.$.Country": body['Country']
+            }})
+        return {
+            "Message": "Address updated"
+        }
+    else:
+        return {"error": "Token expired! Please log in again!"}
